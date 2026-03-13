@@ -1,0 +1,4 @@
+data/CMFD/
+data/FFHQ/
+Screenshot*
+outputs/ddpm_inpaint_clean_to_mask_v2/

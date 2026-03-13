@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "face-mask-diffusion"
+version = "0.1.0"
+description = "Conditional diffusion baseline for realistic face-mask synthesis."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "pillow>=10.0",
+  "torch>=2.2",
+  "torchvision>=0.17",
+]
+
+[project.scripts]
+maskdiff-prepare = "maskdiff.maskedface_net:main"
+maskdiff-train = "maskdiff.train:main"
+maskdiff-generate = "maskdiff.infer:main"
+maskdiff-eval = "maskdiff.eval:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
