@@ -13,13 +13,23 @@ dependencies = [
   "pillow>=10.0",
   "torch>=2.2",
   "torchvision>=0.17",
+  "torchmetrics[image]>=1.0",
+  "diffusers>=0.37",
+  "accelerate>=1.13",
+  "transformers>=4.57",
+  "safetensors>=0.7",
 ]
 
 [project.scripts]
-maskdiff-prepare = "maskdiff.maskedface_net:main"
-maskdiff-train = "maskdiff.train:main"
-maskdiff-generate = "maskdiff.infer:main"
-maskdiff-eval = "maskdiff.eval:main"
+maskdiff-prepare = "DDPM.data.maskedface_net:main"
+maskdiff-train = "DDPM.training.train:main"
+maskdiff-generate = "DDPM.inference.infer:main"
+maskdiff-eval = "DDPM.evaluation.eval:main"
+maskdiff-train-mask = "DDPM.mask_predictor.train:main"
+maskdiff-predict-mask = "DDPM.mask_predictor.infer:main"
+maskdiff-pipeline = "DDPM.inference.pipeline:main"
+sd-inpaint-train = "stable_diffusion_inpainting.train:main"
+sd-inpaint-generate = "stable_diffusion_inpainting.infer:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

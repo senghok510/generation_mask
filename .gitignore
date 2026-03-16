@@ -1,4 +1,25 @@
-data/CMFD/
-data/FFHQ/
+# Datasets
+data/
+
+# Model outputs & checkpoints
+outputs/
+
+# Model weights
+models/
+*.pt
+*.pth
+*.ckpt
+*.task
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Screenshots
 Screenshot*
-outputs/ddpm_inpaint_clean_to_mask_v2/
