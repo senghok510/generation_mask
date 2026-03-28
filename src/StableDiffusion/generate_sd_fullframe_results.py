@@ -13,9 +13,9 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 try:
+    from .facemask_utils import pair_images_by_stem
+except ImportError:
     from facemask_utils import pair_images_by_stem
-except ModuleNotFoundError:
-    from scripts.facemask_utils import pair_images_by_stem
 
 
 LORA_WEIGHT_NAME = "pytorch_lora_weights.safetensors"

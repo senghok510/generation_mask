@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "face-mask-diffusion"
 version = "0.1.0"
-description = "Conditional diffusion baseline for realistic face-mask synthesis."
+description = "DDPM and Stable Diffusion implementations for realistic face-mask synthesis."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -16,6 +16,12 @@ dependencies = [
   "torchmetrics[image]>=1.0",
   "diffusers>=0.37",
   "accelerate>=1.13",
+  "huggingface_hub>=0.34",
+  "lpips>=0.1",
+  "peft>=0.18",
+  "pytorch-fid>=0.3",
+  "scipy>=1.14",
+  "tqdm>=4.66",
   "transformers>=4.57",
   "safetensors>=0.7",
 ]
@@ -28,8 +34,12 @@ maskdiff-eval = "DDPM.evaluation.eval:main"
 maskdiff-train-mask = "DDPM.mask_predictor.train:main"
 maskdiff-predict-mask = "DDPM.mask_predictor.infer:main"
 maskdiff-pipeline = "DDPM.inference.pipeline:main"
-sd-inpaint-train = "stable_diffusion_inpainting.train:main"
-sd-inpaint-generate = "stable_diffusion_inpainting.infer:main"
+sd-download-ffhq = "StableDiffusion.download_ffhq_subset:main"
+sd-prepare-dataset = "StableDiffusion.prepare_paper_dataset:main"
+sd-train = "StableDiffusion.train_sd_fullframe_lora:main"
+sd-generate = "StableDiffusion.generate_sd_fullframe_results:main"
+sd-eval-pairs = "StableDiffusion.run_pair_metrics:main"
+sd-eval-fid = "StableDiffusion.run_pytorch_fid:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -17,16 +17,16 @@ except ModuleNotFoundError:
     torch = None
 
 try:
+    from .facemask_utils import derive_binary_mask_from_paths
+except ImportError:
     from facemask_utils import derive_binary_mask_from_paths
-except ModuleNotFoundError:
-    from scripts.facemask_utils import derive_binary_mask_from_paths
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
 def default_torch_home() -> Path:
-    return Path(__file__).resolve().parents[1] / ".torch_cache"
+    return Path(__file__).resolve().parents[2] / ".torch_cache"
 
 
 def parse_args() -> argparse.Namespace:

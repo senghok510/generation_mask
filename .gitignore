@@ -1,8 +1,13 @@
 # Datasets
 data/
+datasets/
 
 # Model outputs & checkpoints
 outputs/
+generated/
+checkpoints/
+.torch_cache/
+*.log
 
 # Model weights
 models/

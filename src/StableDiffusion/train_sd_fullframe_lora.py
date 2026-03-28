@@ -22,9 +22,9 @@ from diffusers.optimization import get_scheduler
 from transformers import CLIPTextModel, CLIPTokenizer
 
 try:
+    from .facemask_utils import pair_images_by_stem
+except ImportError:
     from facemask_utils import pair_images_by_stem
-except ModuleNotFoundError:
-    from scripts.facemask_utils import pair_images_by_stem
 
 try:
     from peft import LoraConfig

@@ -1,255 +1,216 @@
-# Face Mask Diffusion
+# Face Mask Generation with Diffusion Models
 
-A conditional DDPM that synthesizes realistic face masks on clean face images.
-The model is conditioned on the original clean face and a binary mask region, so it
-edits **only inside the mask** and preserves everything outside it.
+This repository contains two diffusion-based implementations for clean-to-masked face synthesis on aligned FFHQ and MaskedFace-Net CMFD pairs:
 
-Built on top of *Generation of Realistic Facemasked Faces With GANs* (Mumford, 2021),
-replacing the global GAN translation with a local, mask-aware diffusion model.
+- `src/DDPM/`: pixel-space conditional DDPM developed by Hok Seng.
+- `src/StableDiffusion/`: full-frame Stable Diffusion LoRA pipeline developed by Mohamed Amine Amrani.
 
----
+Both implementations target the same task introduced in *Generation of Realistic Facemasked Faces With GANs* (Mumford, 2021): generate a realistic masked face from a clean portrait while preserving facial identity and overall image structure.
 
-## Project Layout
+## Repository Layout
 
-```
+```text
 generation_mask/
-├── src/DDPM/
-│   ├── core/                  Shared building blocks
-│   │   ├── diffusion.py       DDPM schedule & sampling
-│   │   ├── model.py           ConditionalUNet + MaskPredictorUNet
-│   │   └── utils.py           Image / filesystem helpers
-│   ├── data/                  Data loading & preparation
-│   │   ├── dataset.py         FaceMaskDataset (triplet loader)
-│   │   ├── maskedface_net.py  FFHQ + CMFD dataset preparation CLI
-│   │   └── prepare.py         Incremental dataset builder
-│   ├── training/              DDPM training
-│   │   └── train.py
-│   ├── inference/             DDPM inference
-│   │   ├── infer.py           Single-model sampling CLI
-│   │   └── pipeline.py        Two-stage pipeline (mask predictor → DDPM)
-│   ├── mask_predictor/        U-Net mask predictor (Stage 1)
-│   │   ├── train.py
-│   │   └── infer.py
-│   └── evaluation/            Metrics
-│       └── eval.py
-├── data/
-│   ├── train/
-│   │   ├── clean_face/
-│   │   ├── masked_face/
-│   │   └── binary_mask/
-│   ├── validation/
-│   │   ├── clean_face/
-│   │   ├── masked_face/
-│   │   └── binary_mask/
-│   └── test/
-│       ├── clean_face/
-│       ├── masked_face/
-│       └── binary_mask/
-└── pyproject.toml
+  src/
+    DDPM/
+      core/
+      evaluation/
+      inference/
+      mask_predictor/
+      training/
+    StableDiffusion/
+      download_ffhq_subset.py
+      facemask_utils.py
+      generate_sd_fullframe_results.py
+      prepare_paper_dataset.py
+      run_pair_metrics.py
+      run_pytorch_fid.py
+      train_sd_fullframe_lora.py
+  data/
+  outputs/
+  pyproject.toml
+  README.md
 ```
-
-Files are matched by stem: `clean_face/01000.jpg` pairs with `masked_face/01000.jpg`
-and `binary_mask/01000.png`.
-
----
 
 ## Installation
 
 ```bash
-python3 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
----
+## Dataset
 
-## Pretrained Checkpoints
+Both implementations rely on:
 
-Both the **DDPM generator** and the **mask predictor** checkpoints are available here:
+- [FFHQ](https://github.com/NVlabs/ffhq-dataset) for clean faces
+- [MaskedFace-Net CMFD](https://github.com/cabani/MaskedFace-Net) for masked faces
 
-> **[Google Drive — checkpoints](https://drive.google.com/drive/folders/1CiMtDYbDme-EXGmAG751ms6LkG0W6_eT?usp=share_link)**
+CMFD is not downloaded by this repository. It must be obtained separately from the official MaskedFace-Net release and placed locally before dataset preparation.
 
-Download and place them anywhere convenient, then pass the paths via `--checkpoint`,
-`--ddpm-checkpoint`, or `--mask-checkpoint` as shown below.
+## DDPM Implementation
 
----
+The DDPM branch is a conditional diffusion pipeline that edits a clean face inside a binary mask region. It includes:
 
-## Step 0 — Prepare the Dataset
+- a conditional DDPM generator in `src/DDPM/training` and `src/DDPM/inference`
+- a mask-predictor U-Net in `src/DDPM/mask_predictor`
+- DDPM evaluation utilities in `src/DDPM/evaluation`
 
-You need [FFHQ](https://github.com/NVlabs/ffhq-dataset) clean faces and
-[MaskedFace-Net CMFD](https://github.com/cabani/MaskedFace-Net) masked faces.
-
-```bash
-DDPM-prepare \
-  --ffhq-dir /path/to/ffhq \
-  --cmfd-dir /path/to/MaskedFace-Net/CMFD \
-  --output-dir data/ \
-  --train-count 2000 \
-  --test-count 1000 \
-  --mode symlink
-```
-
-This creates `data/train/` and `data/test/` with the three subdirectories above,
-pairing each CMFD masked face to its corresponding FFHQ clean face by filename stem
-and deriving a binary mask from the pixel difference.
-
----
-
-## Step 1 — Train the Mask Predictor (U-Net, Stage 1)
-
-The mask predictor learns to segment the mask region directly from a clean face image.
-It is trained **independently** from the DDPM.
-
-```bash
-DDPM-train-mask \
-  --train-dir data/train \
-  --val-dir   data/validation \
-  --save-dir  outputs/mask_predictor \
-  --image-size 128 \
-  --batch-size 8 \
-  --epochs 50 \
-  --lr 1e-4 \
-  --base-channels 64
-```
-
-Checkpoints are written to `outputs/mask_predictor/`:
-- `checkpoint_best.pt` — best validation Dice score
-- `checkpoint_last.pt` — last epoch
-
-### Use the pretrained mask predictor checkpoint
-
-Download `mask_predictor/checkpoint_best.pt` from the
-[Google Drive](https://drive.google.com/drive/folders/1CiMtDYbDme-EXGmAG751ms6LkG0W6_eT?usp=share_link)
-and run inference directly:
-
-```bash
-DDPM-predict-mask \
-  --checkpoint   outputs/mask_predictor/checkpoint_best.pt \
-  --input-dir    data/test/clean_face \
-  --output-dir   outputs/predicted_masks \
-  --image-size   128 \
-  --mask-threshold 0.5
-```
-
----
-
-## Step 2 — Train the DDPM Generator
-
-```bash
-DDPM-train \
-  --train-dir     data/train \
-  --val-dir       data/validation \
-  --save-dir      outputs/DDPM_base \
-  --image-size    128 \
-  --batch-size    8 \
-  --epochs        50 \
-  --timesteps     250 \
-  --base-channels 64 \
-  --cfg-dropout   0.1 \
-  --ema-decay     0.999
-```
-
-Checkpoints are written to `outputs/DDPM_base/`:
-- `checkpoint_best.pt` — best validation loss
-- `checkpoint_last.pt` — last epoch
-
----
-
-## Inference
-
-### Option A — DDPM only (provide masks manually)
-
-Use this when you already have binary masks for each input image.
-
-```bash
-DDPM-generate \
-  --checkpoint  outputs/DDPM_base/checkpoint_best.pt \
-  --test-dir    data/test \
-  --output-dir  outputs/generated \
-  --sampler     ddim \
-  --sample-steps 100 \
-  --guidance-scale 2.5
-```
-
-Or with explicit mask directory:
-
-```bash
-DDPM-generate \
-  --checkpoint outputs/DDPM_base/checkpoint_best.pt \
-  --input      data/test/clean_face \
-  --mask-dir   data/test/binary_mask \
-  --output-dir outputs/generated \
-  --sampler    ddim \
-  --sample-steps 100 \
-  --guidance-scale 2.5
-```
-
-### Option B — Two-stage pipeline (mask predictor → DDPM)
-
-Use this when you only have clean face images and want fully automatic mask generation.
-
-```bash
-DDPM-pipeline \
-  --mask-checkpoint outputs/mask_predictor/checkpoint_best.pt \
-  --ddpm-checkpoint outputs/DDPM_base/checkpoint_best.pt \
-  --input-dir  data/test/clean_face \
-  --output-dir outputs/pipeline_generated \
-  --sampler    ddim \
-  --sample-steps 100 \
-  --guidance-scale 2.5 \
-  --save-masks
-```
-
-### Using the pretrained checkpoints from Google Drive
-
-Download both checkpoints from the
-[Google Drive](https://drive.google.com/drive/folders/1CiMtDYbDme-EXGmAG751ms6LkG0W6_eT?usp=share_link),
-place them in `outputs/`, then run Option B above pointing to the downloaded paths.
-
----
-
-## Evaluation
-
-```bash
-DDPM-eval \
-  --pred-dir   outputs/generated \
-  --target-dir data/test/masked_face \
-  --mask-dir   data/test/binary_mask \
-  --mode       image \
-  --output-json outputs/metrics.json
-```
-
-Reported metrics: **MAE** (full / mask region / background), **PSNR**, **FID**, **LPIPS**.
-
-For mask-only evaluation (IoU / Dice):
-
-```bash
-DDPM-eval \
-  --pred-dir   outputs/predicted_masks \
-  --target-dir data/test/binary_mask \
-  --mode       mask
-```
-
----
-
-## CLI Reference
+The package entry points currently exposed for the DDPM workflow are:
 
 | Command | Entry point | Purpose |
 |---|---|---|
-| `DDPM-prepare` | `DDPM.data.maskedface_net:main` | Pair FFHQ + CMFD, build splits |
-| `DDPM-train` | `DDPM.training.train:main` | Train DDPM generator |
-| `DDPM-generate` | `DDPM.inference.infer:main` | DDPM inference with provided masks |
-| `DDPM-pipeline` | `DDPM.inference.pipeline:main` | Two-stage inference (mask predictor → DDPM) |
-| `DDPM-train-mask` | `DDPM.mask_predictor.train:main` | Train U-Net mask predictor |
-| `DDPM-predict-mask` | `DDPM.mask_predictor.infer:main` | Run mask predictor on clean images |
-| `DDPM-eval` | `DDPM.evaluation.eval:main` | Evaluate predictions |
+| `maskdiff-prepare` | `DDPM.data.maskedface_net:main` | Build aligned splits from FFHQ and CMFD |
+| `maskdiff-train` | `DDPM.training.train:main` | Train the DDPM generator |
+| `maskdiff-generate` | `DDPM.inference.infer:main` | DDPM inference with provided masks |
+| `maskdiff-pipeline` | `DDPM.inference.pipeline:main` | Two-stage inference with mask prediction |
+| `maskdiff-train-mask` | `DDPM.mask_predictor.train:main` | Train the mask-predictor U-Net |
+| `maskdiff-predict-mask` | `DDPM.mask_predictor.infer:main` | Predict mask regions from clean images |
+| `maskdiff-eval` | `DDPM.evaluation.eval:main` | Evaluate DDPM outputs |
 
----
+## Stable Diffusion Implementation
+
+The Stable Diffusion branch is a full-frame conditional diffusion pipeline built on `runwayml/stable-diffusion-inpainting` and adapted with broad LoRA over the UNet.
+
+Method summary:
+
+- backbone: Stable Diffusion inpainting checkpoint
+- conditioning: clean face image + text prompt
+- target: masked face image
+- adaptation: broad LoRA across a large portion of the UNet
+- training formulation: full-image conditional diffusion rather than local oracle-mask inpainting
+
+### Stable Diffusion workflow
+
+1. Build the FFHQ subset that matches the available CMFD stems.
+2. Prepare aligned paired train/test folders.
+3. Train the LoRA-adapted Stable Diffusion model.
+4. Generate masked-face predictions.
+5. Evaluate FID and paired image metrics.
+
+### 1. Download the matching FFHQ subset
+
+```bash
+sd-download-ffhq \
+  --cmfd-root /path/to/CMFD \
+  --output-dir datasets/FFHQ_subset \
+  --train-count 20000 \
+  --test-count 2000
+```
+
+Equivalent module invocation:
+
+```bash
+python -m StableDiffusion.download_ffhq_subset \
+  --cmfd-root /path/to/CMFD \
+  --output-dir datasets/FFHQ_subset \
+  --train-count 20000 \
+  --test-count 2000
+```
+
+### 2. Prepare the paired dataset
+
+```bash
+sd-prepare-dataset \
+  --ffhq-root datasets/FFHQ_subset \
+  --masked-root /path/to/CMFD \
+  --output-root datasets/facemask_aligned \
+  --train-count 20000 \
+  --test-count 2000 \
+  --overwrite \
+  --link-mode hardlink
+```
+
+Expected layout:
+
+```text
+datasets/facemask_aligned/
+  paired/
+    train/
+      clean/
+      masked/
+    test/
+      clean/
+      masked/
+  manifest.json
+```
+
+### 3. Train Stable Diffusion with broad LoRA
+
+```bash
+sd-train \
+  --data-root datasets/facemask_aligned/paired \
+  --output-dir checkpoints/sd_fullframe_broad_lora \
+  --resolution 256 \
+  --train-batch-size 2 \
+  --gradient-accumulation-steps 4 \
+  --learning-rate 1e-4 \
+  --lr-scheduler constant \
+  --num-train-epochs 30 \
+  --checkpointing-steps 1250 \
+  --mixed-precision bf16 \
+  --lora-target-mode broad \
+  --lora-rank 16 \
+  --lora-alpha 16 \
+  --gradient-checkpointing \
+  --allow-tf32
+```
+
+Resumable checkpoints include:
+
+- LoRA weights
+- optimizer state
+- learning-rate scheduler state
+- RNG state
+- training metadata
+
+### 4. Generate masked-face predictions
+
+```bash
+sd-generate \
+  --split-root datasets/facemask_aligned/paired/test \
+  --lora-dir checkpoints/sd_fullframe_broad_lora/final \
+  --output-dir generated/sd_fullframe_test \
+  --num-inference-steps 30 \
+  --guidance-scale 7.5
+```
+
+### 5. Evaluate outputs
+
+FID:
+
+```bash
+sd-eval-fid \
+  --real-dir datasets/facemask_aligned/paired/test/masked \
+  --fake-dir generated/sd_fullframe_test \
+  --device cuda:0
+```
+
+Paired metrics:
+
+```bash
+sd-eval-pairs \
+  --pred-dir generated/sd_fullframe_test \
+  --target-dir datasets/facemask_aligned/paired/test/masked \
+  --clean-dir datasets/facemask_aligned/paired/test/clean \
+  --compute-lpips \
+  --device cuda
+```
+
+Reported paired metrics:
+
+- MAE over the full image
+- MAE inside the inferred mask region
+- MAE on the background
+- PSNR
+- LPIPS
+
+### Stable Diffusion result
+
+- FID on the evaluation split: `17.7`
 
 ## Notes
 
-- CMFD contains ~67,000 correctly masked synthetic faces aligned to FFHQ.
-- MaskedFace-Net is distributed under CC BY-NC-SA 4.0 — research and non-commercial use only.
-- The default model is a compact pixel-space DDPM (128×128). For higher quality,
-  swap the U-Net backbone into a latent diffusion or inpainting architecture.
-- Identity preservation can be improved by adding a frozen face-embedder loss during fine-tuning.
+- Dataset files, checkpoints, generated images, and local caches are excluded from version control.
+- MaskedFace-Net is distributed under CC BY-NC-SA 4.0 and is intended for research and non-commercial use.

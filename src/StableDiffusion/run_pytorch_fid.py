@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def default_torch_home() -> Path:
-    return Path(__file__).resolve().parents[1] / ".torch_cache"
+    return Path(__file__).resolve().parents[2] / ".torch_cache"
 
 
 def parse_args() -> argparse.Namespace:
