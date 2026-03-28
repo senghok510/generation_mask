@@ -281,7 +281,7 @@ sd-download-ffhq \
   --cmfd-root /path/to/CMFD \
   --output-dir datasets/FFHQ_subset \
   --train-count 20000 \
-  --test-count 2000
+  --test-count 1000
 ```
 
 Equivalent module invocation:
@@ -291,7 +291,7 @@ python -m StableDiffusion.download_ffhq_subset \
   --cmfd-root /path/to/CMFD \
   --output-dir datasets/FFHQ_subset \
   --train-count 20000 \
-  --test-count 2000
+  --test-count 1000
 ```
 
 ### 2. Prepare the paired dataset
@@ -302,7 +302,7 @@ sd-prepare-dataset \
   --masked-root /path/to/CMFD \
   --output-root datasets/facemask_aligned \
   --train-count 20000 \
-  --test-count 2000 \
+  --test-count 1000 \
   --overwrite \
   --link-mode hardlink
 ```
